@@ -3,31 +3,139 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Warning</title>
+    <title>Privacy Settings</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             text-align: center;
             padding: 20px;
-            background-color: #f44336;
+            background-color: #6a0dad;  /* Purple background */
+            color: #fff;  /* White text color */
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
+            width: 400px;
+            height: 500px;
+        }
+
+        h1 {
+            font-size: 24px;
+            margin-bottom: 10px;
+            color: #fff;
+        }
+
+        p {
+            font-size: 16px;
+            color: #eee;  /* Lighter text color for better visibility */
+            margin-bottom: 20px;
+        }
+
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 30px;
+        }
+
+        .toggle-label {
+            margin-right: 10px;
+            font-size: 18px;
+            color: #fff;  /* White label color */
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #fff;  /* White slider background */
+            transition: .4s;
+            border-radius: 34px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: #6a0dad;  /* Purple for the slider circle */
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #fff;  /* White background when checked */
+        }
+
+        input:checked + .slider:before {
+            background-color: #6a0dad;  /* Purple slider circle when checked */
+            transform: translateX(26px);
+        }
+
+        .status {
+            margin-top: 20px;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .status.enabled {
+            color: #4caf50;  /* Green when enabled */
+        }
+
+        .status.disabled {
+            color: #f44336;  /* Red when disabled */
+        }
+
+        .alert {
+            margin-top: 15px;
+            font-size: 14px;
+            padding: 10px;
+            border-radius: 5px;
+            display: none;
+        }
+
+        .alert.enabled {
+            background-color: #4caf50;  /* Green background when privacy enabled */
             color: white;
         }
-        button {
-            margin-top: 20px;
-            padding: 10px 20px;
-            background-color: white;
-            color: #f44336;
-            border: none;
-            cursor: pointer;
+
+        .alert.disabled {
+            background-color: #f44336;  /* Red background when privacy disabled */
+            color: white;
         }
     </style>
 </head>
 <body>
-    <h1>Warning</h1>
-    <p>This site has been flagged as potentially dangerous.</p>
-    <button id="proceed">Proceed Anyway</button>
-    <button id="closeTab">Close Tab</button>
+    <h1>Privacy Settings</h1>
+    <p>Enable or disable privacy features with a single toggle.</p>
 
+    <div class="toggle-container">
+        <span class="toggle-label">Privacy Mode:</span>
+        <label class="switch">
+            <input type="checkbox" id="privacyToggle">
+            <span class="slider"></span>
+        </label>
+    </div>
+
+    <div id="statusMessage" class="status disabled">Privacy is OFF</div>
     
+    <div id="alertMessage" class="alert"></div>
+
+    <script src="popup.js"></script>
 </body>
 </html>

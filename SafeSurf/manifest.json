@@ -10,13 +10,18 @@
     "activeTab",
     "storage",
     "alarms",             
-    "tabs"                 
+    "tabs",
+    "privacy",
+    "contentSettings",
+    "browsingData"
   ],
   "background": {
     "service_worker": "background.js"
   },
   "action": {
     "default_popup": "popup.html",
+    "default_popup_width": 400,
+    "default_popup_height": 500, 
     "default_icon": "images/icon128.png"
   },
   "icons": {
@@ -26,8 +31,11 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["background_db.js", "popup.html"],
+      "resources": ["popup.js"],
       "matches": ["<all_urls>"]
     }
-  ]
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  }
 }
