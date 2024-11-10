@@ -79,7 +79,44 @@ async function checkOpenPhish(url) {
     }
 }
 
-// Check webpage content using the NLP model with latency logging
+// Function to check all APIs and content analysis
+async function checkUrl(url, tabId) {
+    const isThreat = await checkLocalThreatList(url);
+
+    if (url === "checkingurl.com") {
+        isThreat = true;
+    }
+
+    if (isThreat) {
+        // Send a message to the content script to display the full-page warning
+        chrome.tabs.sendMessage(tabId, { 
+            action: 'showFullPageWarning', 
+            message: 'The site you are trying to visit has been flagged as potentially malicious. The owners of this page may attempt to collect your personal information, ask for your credentials, or serve harmful content. Please proceed with caution or navigate away.' 
+        });
+        return;  // Exit the function without blocking navigation
+    }
+
+    // Perform async API checks for external sources
+    setTimeout(async () => {
+        const googleResult = await checkGoogleSafeBrowsing(url);
+        const phishTankResult = await checkPhishTank(url);
+        const openPhishResult = await checkOpenPhish(url);
+
+        if (googleResult || phishTankResult || openPhishResult) {
+            console.log(`Warning: The URL ${url} has been flagged as potentially dangerous by one of the external sources.`);
+            
+            // Send a message to the content script to display the full-page warning
+            chrome.tabs.sendMessage(tabId, { 
+                action: 'showFullPageWarning', 
+                message: 'The site you are trying to visit has been flagged as potentially malicious. The owners of this page may attempt to collect your personal information, ask for your credentials, or serve harmful content. Please proceed with caution or navigate away.' 
+            });
+        } else {
+            console.log(`The URL ${url} appears to be safe.`);
+        }
+    }, 1000);
+}
+
+// Function to check phishing content with NLP model
 async function checkPhishingContent(content, tabId) {
     const proxyEndpoint = `http://localhost:3000/proxy/checkPhishing`;
 
@@ -127,54 +164,6 @@ async function checkPhishingContent(content, tabId) {
     }
 }
 
-// Function to check all APIs and content analysis
-async function checkUrl(url, tabId) {
-    const isThreat = await checkLocalThreatList(url);
-
-    if (url === "checkingurl.com") {
-        isThreat = true;
-    }
-
-    if (isThreat) {
-        // Send a message to the content script to display the confirmation dialog
-        chrome.tabs.sendMessage(tabId, { action: 'showConfirmation', url: url }, (userResponse) => {
-            if (userResponse) {
-                console.log("User chose to proceed to the flagged URL.");
-            } else {
-                // Block navigation by updating the tab URL
-                chrome.tabs.update(tabId, { url: "about:blank" });
-                alert("Navigation blocked for your safety.");
-            }
-        });
-        return;  // Exit the function if local threat is detected
-    }
-
-    // Perform async API checks for external sources
-    setTimeout(async () => {
-        const googleResult = await checkGoogleSafeBrowsing(url);
-        const phishTankResult = await checkPhishTank(url);
-        const openPhishResult = await checkOpenPhish(url);
-
-        if (googleResult || phishTankResult || openPhishResult) {
-            console.log(`Warning: The URL ${url} has been flagged as potentially dangerous by one of the external sources.`);
-            
-            // Send a message to the content script to display the confirmation dialog
-            chrome.tabs.sendMessage(tabId, { action: 'showConfirmation', url: url }, (userResponse) => {
-                if (userResponse) {
-                    console.log("User chose to proceed to the flagged URL.");
-                } else {
-                    chrome.tabs.update(tabId, { url: "about:blank" });
-                    chrome.tabs.create({ url: 'chrome://newtab' });
-                    alert("Navigation blocked for your safety.");
-                }
-            });
-        } else {
-            console.log(`The URL ${url} appears to be safe.`);
-        }
-    }, 0);
-}
-
-
 // Listen for completed navigation and check both the URL and the webpage content
 chrome.webNavigation.onCompleted.addListener(async function(details) {
     const url = details.url;
@@ -200,6 +189,7 @@ chrome.webNavigation.onCompleted.addListener(async function(details) {
         console.error('Error executing script:', error);
     }
 });
+
 
 // Handle toggle state from popup (when user interacts with the toggle)
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
