@@ -2,10 +2,19 @@ document.addEventListener('DOMContentLoaded', function() {
     const toggle = document.getElementById('privacyToggle');
     const statusMessage = document.getElementById('statusMessage');
     const alertMessage = document.getElementById('alertMessage');
+    const phishingAlert = document.getElementById('phishingAlert');
 
+    // Initial setup from storage
     chrome.storage.sync.get('privacyEnabled', function(data) {
         toggle.checked = data.privacyEnabled || false;
         updateStatusMessage(toggle.checked);
+    });
+
+    // Listen for messages indicating phishing detection
+    chrome.runtime.onMessage.addListener((message) => {
+        if (message.action === 'phishingDetected') {
+            showPhishingAlert(message.explanation);
+        }
     });
 
     toggle.addEventListener('change', function() {
@@ -59,6 +68,13 @@ document.addEventListener('DOMContentLoaded', function() {
         alertMessage.style.display = 'block';
         setTimeout(() => {
             alertMessage.style.display = 'none';
-        }, 10000); // Hide alert after 5 seconds
+        }, 10000); // Hide alert after 10 seconds
+    }
+
+    function showPhishingAlert(explanation) {
+        phishingAlert.innerHTML = `
+            <strong>Warning:</strong> This site has been flagged as phishing!<br>
+        `;
+        phishingAlert.style.display = 'block';
     }
 });

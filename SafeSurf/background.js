@@ -79,9 +79,12 @@ async function checkOpenPhish(url) {
     }
 }
 
-// Check webpage content using the NLP model
+// Check webpage content using the NLP model with latency logging
 async function checkPhishingContent(content, tabId) {
     const proxyEndpoint = `http://localhost:3000/proxy/checkPhishing`;
+
+    // Start time for latency measurement
+    const startTime = Date.now();
 
     const response = await fetch(proxyEndpoint, {
         method: 'POST',
@@ -91,12 +94,15 @@ async function checkPhishingContent(content, tabId) {
         body: JSON.stringify({ content: content })
     });
 
+    // End time for latency measurement
+    const endTime = Date.now();
+    const latency = endTime - startTime;
+    console.log(`NLP Phishing Analysis Latency: ${latency} ms`);
+
     if (response.ok) {
         const data = await response.json();
-        if (data.score > 50) {
-            // Warning popup or icon change based on phishing score
-            console.log(`Warning: The webpage content is flagged as phishing with a score of ${data.score}.`);
-            console.log(`Explanation: ${data.explanation}`);
+        if (data.score > 50) {  // Assuming 50 is the threshold for phishing detection
+            console.log(`Warning: The webpage content is flagged as phishing by the NLP Model.`);
             
             // Change the icon to red
             chrome.action.setIcon({
@@ -108,13 +114,13 @@ async function checkPhishingContent(content, tabId) {
                 tabId: tabId // Only for the current tab
             });
 
-            // Warning popup
-            chrome.action.setPopup({
-                tabId: tabId,
-                popup: "popup.html"
+            // Show an alert box to the user
+            chrome.tabs.sendMessage(tabId, {
+                action: 'showAlert',
+                message: 'This website has been flagged by the NLP Model for PHISHING!! Tread CAREFULLY!'
             });
         } else {
-            console.log(`The webpage content appears to be safe.`);
+            console.log(`The webpage content appears to be safe according to the NLP Model.`);
         }
     } else {
         console.error('Phishing content check failed.');
@@ -130,18 +136,20 @@ async function checkUrl(url, tabId) {
     }
 
     if (isThreat) {
-        // Show an alert or some sort of notification to the user
-        const userResponse = confirm(`Warning: The URL ${url} has been flagged as potentially dangerous. Do you want to proceed anyway?`);
-
-        if (!userResponse) {
-            // Block the navigation
-            chrome.tabs.update(tabId, { url: "about:blank" });
-            alert("Navigation blocked for your safety.");
-            return;
-        }
+        // Send a message to the content script to display the confirmation dialog
+        chrome.tabs.sendMessage(tabId, { action: 'showConfirmation', url: url }, (userResponse) => {
+            if (userResponse) {
+                console.log("User chose to proceed to the flagged URL.");
+            } else {
+                // Block navigation by updating the tab URL
+                chrome.tabs.update(tabId, { url: "about:blank" });
+                alert("Navigation blocked for your safety.");
+            }
+        });
+        return;  // Exit the function if local threat is detected
     }
 
-    // Proceed with async API checks in the background
+    // Perform async API checks for external sources
     setTimeout(async () => {
         const googleResult = await checkGoogleSafeBrowsing(url);
         const phishTankResult = await checkPhishTank(url);
@@ -150,20 +158,15 @@ async function checkUrl(url, tabId) {
         if (googleResult || phishTankResult || openPhishResult) {
             console.log(`Warning: The URL ${url} has been flagged as potentially dangerous by one of the external sources.`);
             
-            // Change the icon to red
-            chrome.action.setIcon({
-                path: {
-                    "16": "icons/icon_red16.png",
-                    "48": "icons/icon_red48.png",
-                    "128": "icons/icon_red128.png"
-                },
-                tabId: tabId // Only for the current tab
-            });
-
-            // Warning popup
-            chrome.action.setPopup({
-                tabId: tabId,
-                popup: "popup.html"
+            // Send a message to the content script to display the confirmation dialog
+            chrome.tabs.sendMessage(tabId, { action: 'showConfirmation', url: url }, (userResponse) => {
+                if (userResponse) {
+                    console.log("User chose to proceed to the flagged URL.");
+                } else {
+                    chrome.tabs.update(tabId, { url: "about:blank" });
+                    chrome.tabs.create({ url: 'chrome://newtab' });
+                    alert("Navigation blocked for your safety.");
+                }
             });
         } else {
             console.log(`The URL ${url} appears to be safe.`);
@@ -171,23 +174,32 @@ async function checkUrl(url, tabId) {
     }, 0);
 }
 
-// // Listen for completed navigation and check both the URL and the webpage content
-// chrome.webNavigation.onCompleted.addListener(async function(details) {
-//     const url = details.url;
-//     const tabId = details.tabId;
 
-//     // Check the URL using external sources
-//     await checkUrl(url, tabId);
+// Listen for completed navigation and check both the URL and the webpage content
+chrome.webNavigation.onCompleted.addListener(async function(details) {
+    const url = details.url;
+    const tabId = details.tabId;
 
-//     // Extract the webpage content and send it for phishing analysis using NLP model
-//     chrome.scripting.executeScript({
-//         target: { tabId: tabId },
-//         func: () => document.body.innerText,  // Extract page content
-//     }, (results) => {
-//         const content = results[0].result;
-//         checkPhishingContent(content, tabId);  // Send content to server for phishing content check
-//     });
-// });
+    // Check the URL using external sources
+    await checkUrl(url, tabId);
+
+    // Extract the webpage content and send it for phishing analysis using NLP model
+    try {
+        const results = await chrome.scripting.executeScript({
+            target: { tabId: tabId },
+            func: () => document.body.innerText,  // Extract page content
+        });
+
+        if (results && results.length > 0) {
+            const content = results[0].result;  // Ensure results has content
+            checkPhishingContent(content, tabId);  // Send content to server for phishing content check
+        } else {
+            console.error('No results returned from executeScript.');
+        }
+    } catch (error) {
+        console.error('Error executing script:', error);
+    }
+});
 
 // Handle toggle state from popup (when user interacts with the toggle)
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
